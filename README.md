@@ -1,10 +1,11 @@
 # tangram
 
 # How to win?
-You have to complete all the silhouttes with the tangram figures.
+You have to complete all the silhouttes with the tangram figures leaving no white space.
 
 # How to play?
-You need a mouse or a keyboard, with the mouse you just drag the pieces and rotate them with the mouse's wheel. 
+You need a mouse or a keyboard. 
+With the mouse you just drag the pieces and rotate them with the mouse's wheel. 
 With the keyboard, you can select the figures with the numbers (1-7), move them fastly with wasd or slowly with the arrow keys and rotate them with q and e.
 
 # Creating levels
