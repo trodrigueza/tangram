@@ -687,37 +687,37 @@ function setup() {
       }
     },
   };
-  nextButton = {
-    // 1. Data
-    _position: createVector(40, height-15),
-    _rotation: 0,
-    // _edge: random(40, 80),
-    _edge: 20,
-    _color: color('rgba(150,254,193,1)'),
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // object shape
-    shape: function() {
-      push();
-      rect(0, 0, this._edge, this._edge);  
-      pop();
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function() {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
+//   nextButton = {
+//     // 1. Data
+//     _position: createVector(40, height-15),
+//     _rotation: 0,
+//     // _edge: random(40, 80),
+//     _edge: 20,
+//     _color: color('rgba(150,254,193,1)'),
+//     _strokeColor: color('black'),
+//     _strokeWeight: 1,
+//     // object shape
+//     shape: function() {
+//       push();
+//       rect(0, 0, this._edge, this._edge);  
+//       pop();
+//     },
+//     // Implement this function to select a piece with
+//     // a pointer device such as a mouse or a touch screen
+//     pick: function() {
+//       if(colorEquality(get(mouseX, mouseY), this._color.levels)){
 
-        buttonPicked = this
-      }
-      if(buttonPicked === this){
-        check = true
-        buttonPicked = playButton
-        this._strokeColor = color('white')
-      }else{
-        this._strokeColor = color('black') 
-      }
-    },
-  };
+//         buttonPicked = this
+//       }
+//       if(buttonPicked === this){
+//         check = true
+//         buttonPicked = playButton
+//         this._strokeColor = color('white')
+//       }else{
+//         this._strokeColor = color('black') 
+//       }
+//     },
+//   };
   previousButton = {
     // 1. Data
     _position: createVector(14, height-15),
