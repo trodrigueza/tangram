@@ -751,7 +751,7 @@ function setup() {
   
   draws = [cuadrado1, triangulo1, triangulo2, triangulo22, triangulo3, triangulo33, parall1]
   
-  buttons = [saveButton, editButton, playButton, exitButton, nextButton]
+  buttons = [saveButton, editButton, playButton, exitButton]
   
   levels = [level6, level1, level2, level3, level5, level4, lastLevel]
   // call and executes the piece randomized method:
