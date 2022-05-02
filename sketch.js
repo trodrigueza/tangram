@@ -789,9 +789,9 @@ function draw() {
         displayPiece(element)
       }
     }
-    if(levelNum < levels.length-1 && player){
-        displayButton(nextButton)
-    }
+//     if(levelNum < levels.length-1 && player){
+//         displayButton(nextButton)
+//     }
     // if(levelNum > 0){
     //   displayButton(previousButton)
     // }
