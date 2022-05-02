@@ -1,0 +1,74 @@
+{
+  "piezas": [
+    {
+      "id": "cuadrado",
+      "position": [
+        185,
+        300
+      ],
+      "rotation": [
+        180
+      ]
+    },
+    {
+      "id": "triangulo1",
+      "position": [
+        289,
+        300
+      ],
+      "rotation": [
+        540
+      ]
+    },
+    {
+      "id": "triangulo2",
+      "position": [
+        219,
+        231
+      ],
+      "rotation": [
+        315
+      ]
+    },
+    {
+      "id": "triangulo22",
+      "position": [
+        288,
+        231
+      ],
+      "rotation": [
+        405
+      ]
+    },
+    {
+      "id": "triangulo3",
+      "position": [
+        341,
+        283
+      ],
+      "rotation": [
+        225
+      ]
+    },
+    {
+      "id": "triangulo33",
+      "position": [
+        237,
+        283
+      ],
+      "rotation": [
+        495
+      ]
+    },
+    {
+      "id": "parall1",
+      "position": [
+        324,
+        150
+      ],
+      "rotation": [
+        -450
+      ]
+    }
+  ]
+}
