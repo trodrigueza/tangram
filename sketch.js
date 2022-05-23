@@ -148,7 +148,7 @@ function preload() {
 }
 
 function setup() {
-  createCanvas(480, 480);
+  createCanvas(1000, 480);
   angleMode(DEGREES);
   rectMode(CENTER);
   
