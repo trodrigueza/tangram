@@ -5,25 +5,25 @@
     <meta charset="utf-8">
 
   </head>
-  <style>
+<!--   <style>
       div {
         height: 1000px;
         background: linear-gradient(to bottom, #33ccff 0%, #ff99cc 100%)
       }
-</style>
+</style> -->
 <body>
 <center>
 <main>
 </main>
     <script src="sketch.js"></script> 
-    <div id="log"></div>
+    <div id="loggg"></div>
     <script> 
     (function () {
     if (!console) {
         console = {};
     }
     var old = console.log;
-    var logger = document.getElementById('log');
+    var logger = document.getElementById('loggg');
     console.log = function (message) {
         if (typeof message == 'object') {
             logger.innerHTML += (JSON && JSON.stringify ? JSON.stringify(message) : String(message)) + '<br />';
