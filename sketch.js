@@ -148,7 +148,7 @@ function preload() {
 }
 
 function setup() {
-  createCanvas(1000, 480);
+  createCanvas(480, 480);
   angleMode(DEGREES);
   rectMode(CENTER);
   
@@ -302,7 +302,8 @@ function mouseClicked() {
         console.log('Back to menu!')
       }else if(buttonPicked == buttons[3]){
         if(countPixels(240) < 158500){
-          throw new Error('Please, do not overlap the pieces!')
+          console.log('Please, do not overlap the pieces!')
+          throw new Error('Pieces are overleapped')
         }
         exportar()
       }else if(buttonPicked == buttons[4]){
