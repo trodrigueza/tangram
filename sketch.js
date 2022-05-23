@@ -181,7 +181,7 @@ function draw() {
     buttons[1].display(); // dibujar botón de editar
     texto("Play", 'black', width/2-15, height/2-55);
     texto("Edit", 'black', width/2-15, height/2+40);
-    image(img, -25, -20); // mostrar la imagen TANGRAM
+    image(img, -15, -15); // mostrar la imagen TANGRAM
   } // interfaz: si editor es false y player es false (pantalla de inicio)
   if(player || editor){
     if(player) {
