@@ -148,6 +148,7 @@ function preload() {
 }
 
 function setup() {
+  pixelDensity(1)
   createCanvas(480, 480);
   angleMode(DEGREES);
   rectMode(CENTER);
@@ -181,7 +182,7 @@ function draw() {
     buttons[1].display(); // dibujar botón de editar
     texto("Play", 'black', width/2-15, height/2-55);
     texto("Edit", 'black', width/2-15, height/2+40);
-    image(img, -15, -15); // mostrar la imagen TANGRAM
+    image(img, -25, -20); // mostrar la imagen TANGRAM
   } // interfaz: si editor es false y player es false (pantalla de inicio)
   if(player || editor){
     if(player) {
@@ -214,14 +215,6 @@ function draw() {
   } // interfaz: si player es true o editor es true
   check = isCorrect()
 } 
-    
-function texto(str, color, x, y){
-    push()
-    fill(color)
-    textSize(15)
-    text(str, x, y)
-    pop()
-}
 
 function displayLevel(level){
   level_pieces = []
@@ -267,7 +260,7 @@ function countPixels(num){
 }
 
 function isCorrect() {
-  if(countPixels(247) < 2500) { 
+  if(countPixels(247) < 450) { 
     return true
   }
   return false
@@ -301,9 +294,9 @@ function mouseClicked() {
         levelNum = 0
         console.log('Back to menu!')
       }else if(buttonPicked == buttons[3]){
-        if(countPixels(240) < 158500){
-          console.log('Please, do not overlap the pieces!')
-          throw new Error('Pieces are overleapped')
+        console.log(countPixels(240))
+        if(countPixels(240) < 38000){
+          throw new Error('Please, do not overlap the pieces!')
         }
         exportar()
       }else if(buttonPicked == buttons[4]){
@@ -375,4 +368,12 @@ function randomizePieces(){
   for(var piece of pieces){
     piece.randomize()
   }
+}
+
+function texto(str, color, x, y){
+    push()
+    fill(color)
+    textSize(15)
+    text(str, x, y)
+    pop()
 }
