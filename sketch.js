@@ -1,1042 +1,403 @@
+// Tangram (p5.js)
+//
+// Modos:
+//   'menu'   - logo + botones Play / Edit
+//   'editor' - mover piezas libremente y guardar la disposición como nivel
+//   'player' - cubrir las siluetas blancas de cada nivel
+//
+// Controles:
+//   arrastrar        mover pieza (mantiene el punto de agarre)
+//   rueda del mouse  rotar pieza bajo el cursor (pasos de 15°)
+//   clic derecho     espejar el paralelogramo
+//   1-7 / c          seleccionar pieza / deseleccionar
+//   q / e            rotar la pieza seleccionada
+//   r                espejar el paralelogramo si está seleccionado
+//   WASD / flechas   mover la pieza seleccionada con precisión (mantener)
+//   g                mostrar/ocultar cuadrícula
+
 const gui = 100 * 2.8;
-const canvas_side = gui + 200
-let grid = true;
-let piecePicked;
-let buttonPicked;
-let parallReverse = false;
-let editor = false;
-let player = false;
-let levelNum = 0;
-let check;
-let img;
+const canvas_side = gui + 200;
 const SCALING = 0.7;
 
+// Archivos de nivel en orden de juego. El original los barajaba dos veces
+// (en preload y al armar el arreglo); este es el orden neto resultante.
+const LEVEL_FILES = ['level6', 'level', 'level1', 'level2', 'level4', 'level5', 'level3'];
+
+// Orden fijo para seleccionar con las teclas 1-7, independiente del
+// orden de dibujado (que cambia al traer piezas al frente).
+const KEY_ORDER = [
+  'cuadrado',
+  'triangulo1',
+  'triangulo2',
+  'triangulo22',
+  'triangulo3',
+  'triangulo33',
+  'parall1',
+];
+
+// isLevelSolved() cuenta canales de color en 255. El canal alfa aporta
+// width*height (230400) por sí solo; superar este umbral significa que
+// todavía se ven píxeles blancos de las siluetas.
+const SOLVED_PIXEL_THRESHOLD = 232030;
+// Revisar la victoria cada N frames: recorrer todos los píxeles del canvas
+// en cada frame (como hacía el original) arruinaba el framerate.
+const WIN_CHECK_PERIOD = 10;
+
+let mode = 'menu';
+let levels = [];
+let levelNum = 0;
+let pieces = [];
+let piecesById = {};
+let buttons = {};
+let selectedPiece = null;
+let draggedPiece = null;
+let dragOffset = null;
+let showGrid = true;
+let logoImg;
+let congratsImg;
 
 function preload() {
-  level1 = loadJSON("./Levels/level.json")
-  level2 = loadJSON("./Levels/level1.json")
-  level3 = loadJSON("./Levels/level2.json")
-  level4 = loadJSON("./Levels/level5.json")
-  level5 = loadJSON("./Levels/level4.json")
-  level6 = loadJSON("./Levels/level6.json")
-  lastLevel = loadJSON("./Levels/level3.json")
-  img = loadImage('images/logo.png');
-  img1 = loadImage('images/congrats.png')
+  for (const name of LEVEL_FILES) {
+    levels.push(loadJSON(`./Levels/${name}.json`));
   }
+  logoImg = loadImage('images/logo.png');
+  congratsImg = loadImage('images/congrats.png');
+}
 
 function setup() {
-  pixelDensity(1)
-  angleMode(DEGREES)
+  pixelDensity(1);
+  angleMode(DEGREES);
   rectMode(CENTER);
-  createCanvas(canvas_side, canvas_side);
-  cuadrado1 = {
-    // 1. Data
-    _id: "cuadrado",
-    _position: createVector(),
-    _rotation: 0,
-    // _edge: random(40, 80),
-    _edge: gui/2.8,
-    _color: color('red'),
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // 2. Methods
-    randomize: function() {
-      this._position = createVector(random(width/2, width-50), random(20, height/6));
-      this._rotation = 15 * round(random(0, 25));
-      this._color = color(random(0, 254), random(0, 254), random(0, 254), 254);
-    },
-    // object shape
-    shape: function() {
-      push();
-      rect(0, 0, this._edge, this._edge);  
-      pop();
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function() {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels))       { 
-        piecePicked = this;
-      }
-      if(piecePicked === this){
-        this._strokeColor = color('white')
-      }else{
-        this._strokeColor = color('black') 
-      }
-    },
-    //translate when dragged
-    dragged: function() { 
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        this.position = createVector(mouseX, mouseY); 
-      }
-    },
-    wheel: function(){
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        if(event.deltaY > 0){
-          this._rotation += 15;
-        } else {
-          this._rotation -= 15;
-        }
-      }
-    },
-    // 3. object accessors
-    // position setter
-    set position(position) {
-      this._position = position;
-    },
-    // position getter
-    get position() {
-      return this._position;
-    },
-    set rotation(rotation) {
-      this._rotation = rotation;
-    },
-    get rotation() {
-      return this._rotation
-    },
-    // Implement getters and setters for the remaining
-    // props: this._rotation, this._edge, this._color
-    // 4. Export
-    // export: function(){
-    //   return {
-    //     position: [this.position.x, this.position.y],
-    //     rotation: [this.rotation]
-    //   }
-    };
-  triangulo1 = {
-    // 1. Data
-    _id: "triangulo1",
-    _position: createVector(),
-    _rotation: 0,
-    _color: color('red'),
-    _xo: 0,
-    _yo: 0,
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // 2. Methods
-    randomize: function() {
-      this._position = createVector(random(50, width/2), random(20, height/6));
-      this._rotation = 15 * round(random(0, 25));
-      this._color = color(random(0, 254), random(0, 254), random(0, 254), 254);
-    },
-    // object shape
-    shape: function() {
-      triangle(this._xo - gui / 2.8, this._yo - gui / (2 * 2.8), this._xo, this._yo + gui/(2*2.8), this._xo + gui / 2.8, this._yo - gui / (2*2.8)) 
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function(x, y) {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){ 
-        piecePicked = this;
-      }
-      if(piecePicked === triangulo1){
-        this._strokeColor = color('white')
-      }else{
-        this._strokeColor = color('black') 
-      }
-    },
-    // translate when dragged
-    dragged: function() { 
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        this._position = createVector(mouseX, mouseY);
-        piecePicked = triangulo1;
-      }
-    },
-    wheel: function(){
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        piecePicked = triangulo1;
-        if(event.deltaY > 0){
-          this._rotation += 15;
-        } else {
-          this._rotation -= 15;
-        }
-      }
-    },
-    // 3. position property object accessors
-    // position setter
-    set position(position) {
-      this._position = position;
-    },
-    // position getter
-    get position() {
-      return this._position;
-    },
-    set rotation(rotation) {
-      this._rotation = rotation;
-    },
-    get rotation() {
-      return this._rotation
-    }
-    // Implement getters and setters for the remaining
-    // props: this._rotation, this._edge, this._color
-  }; // mediano
-  triangulo2 = {
-    // 1. Data
-    _id: "triangulo2",
-    _position: createVector(),
-    _rotation: 0,
-    _color: color('red'),
-    _xo: 0,
-    _yo: 0,
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // 2. Methods
-    randomize: function() {
-      this._position = createVector(random(50, width/6), random(height/1.5, height-50));
-      this._rotation = 15 * round(random(0, 25));
-      this._color = color(random(0, 254), random(0, 254), random(0, 254), 254);
-    },
-    // object shape
-    shape: function() {
-      triangle(this._xo, this._yo + gui/4, this._xo + gui / 2, this._yo - gui / 4, this._xo - gui / 2, this._yo - gui / 4)
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function(x, y) {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){ 
-        piecePicked = this;
-      }
-      if(piecePicked === triangulo2){
-        this._strokeColor = color('white')
-        this._strokeWeight = 4
-      }else{
-        this._strokeWeight = 1
-        this._strokeColor = color('black') 
-      }
-    },
-    // translate when dragged
-    dragged: function() { 
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        this._position = createVector(mouseX, mouseY);
-        piecePicked = triangulo2;
-      }
-    },
-    wheel: function(){
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        piecePicked = triangulo2;
-        if(event.deltaY > 0){
-          this._rotation += 15;
-        } else {
-          this._rotation -= 15;
-        }
-      }
-    },
-    // 3. position property object accessors
-    // position setter
-    set position(position) {
-      this._position = position;
-    },
-    // position getter
-    get position() {
-      return this._position;
-    },
-    set rotation(rotation) {
-      this._rotation = rotation;
-    },
-    get rotation() {
-      return this._rotation
-    }
-    // Implement getters and setters for the remaining
-    // props: this._rotation, this._edge, this._color
-  }; // grande 
-  triangulo22 = {
-    // 1. Data
-    _id: "triangulo22",
-    _position: createVector(),
-    _rotation: 0,
-    _color: color('red'),
-    _xo: 0,
-    _yo: 0,
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // 2. Methods
-    randomize: function() {
-      this._position = createVector(random(7*width/8, width-50), random(height/3, height/2));
-      this._rotation = 15 * round(random(0, 25));
-      this._color = color(random(0, 254), random(0, 254), random(0, 254), 254);
-    },
-    // object shape
-    shape: function() {
-      triangle(this._xo, this._yo + gui/4, this._xo + gui / 2, this._yo - gui / 4, this._xo - gui / 2, this._yo - gui / 4)
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function(x, y) {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){ 
-        piecePicked = this;
-      }
-      if(piecePicked === triangulo22){
-        this._strokeColor = color('white')
-        this._strokeWeight = 4
-      }else{
-        this._strokeWeight = 1
-        this._strokeColor = color('black') 
-      }
-    },
-    // translate when dragged
-    dragged: function() { 
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        piecePicked = triangulo22
-        this._position = createVector(mouseX, mouseY);
-      }
-    },
-    wheel: function(){
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        piecePicked = triangulo22
-        if(event.deltaY > 0){
-          this._rotation += 15;
-        } else {
-          this._rotation -= 15;
-        }
-      }
-    },
-    // 3. position property object accessors
-    // position setter
-    set position(position) {
-      this._position = position;
-    },
-    // position getter
-    get position() {
-      return this._position;
-    },
-    set rotation(rotation) {
-      this._rotation = rotation;
-    },
-    get rotation() {
-      return this._rotation
-    }
-    // Implement getters and setters for the remaining
-    // props: this._rotation, this._edge, this._color
-  }; // grande
-  triangulo3 = {
-    // 1. Data
-    _id: "triangulo3",
-    _position: createVector(),
-    _rotation: 0,
-    _color: color('red'),
-    _xo: 0,
-    _yo: 0,
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // 2. Methods
-    randomize: function() {
-      this._position = createVector(random(50, width/8), random(height/3, height/2));
-      this._rotation = 15 * round(random(0, 25));
-      this._color = color(random(0, 254), random(0, 254), random(0, 254), 254);
-    },
-    // object shape
-    shape: function() {
-      triangle(this._xo, this._yo + gui / 8, this._xo + gui / 4, this._yo - gui/8, this._xo - gui / 4, this._yo - gui / 8) 
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function(x, y) {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){ 
-        piecePicked = this;
-      }
-      if(piecePicked === triangulo3){
-        this._strokeColor = color('white')
-        this._strokeWeight = 4
-      }else{
-        this._strokeWeight = 1
-        this._strokeColor = color('black') 
-      }
-    },
-    // translate when dragged
-    dragged: function() { 
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        this._position = createVector(mouseX, mouseY);
-        piecePicked = triangulo3;
-      }
-    },
-    wheel: function(){
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        piecePicked = triangulo3;
-        if(event.deltaY > 0){
-          this._rotation += 15;
-        } else {
-          this._rotation -= 15;
-        }
-      }
-    },
-    // 3. position property object accessors
-    // position setter
-    set position(position) {
-      this._position = position;
-    },
-    // position getter
-    get position() {
-      return this._position;
-    },
-    set rotation(rotation) {
-      this._rotation = rotation;
-    },
-    get rotation() {
-      return this._rotation
-    }
-    // Implement getters and setters for the remaining
-    // props: this._rotation, this._edge, this._color
-  }; // pequeño
-  triangulo33 = {
-    // 1. Data
-    _id: "triangulo33",
-    _position: createVector(),
-    _rotation: 0,
-    _color: color('red'),
-    _xo: 0,
-    _yo: 0,
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // 2. Methods
-    randomize: function() {
-      this._position = createVector(random(5*width/6, width-20), random(height/1.5, height-20));
-      this._rotation = 15 * round(random(0, 25));
-      this._color = color(random(0, 254), random(0, 254), random(0, 254), 254);
-    },
-    // object shape
-    shape: function() {
-      triangle(this._xo, this._yo + gui / 8, this._xo + gui / 4, this._yo - gui/8, this._xo - gui / 4, this._yo - gui / 8) 
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function(x, y) {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){ 
-        piecePicked = this;
-      }
-      if(piecePicked === triangulo33){
-        this._strokeColor = color('white')
-        this._strokeWeight = 4
-      }else{
-        this._strokeWeight = 1
-        this._strokeColor = color('black') 
-      }
-    },
-    // translate when dragged
-    dragged: function() { 
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        this._position = createVector(mouseX, mouseY);
-        piecePicked = triangulo33;
-      }
-    },
-    wheel: function(){
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        piecePicked = triangulo33;
-        if(event.deltaY > 0){
-          this._rotation += 15;
-        } else {
-          this._rotation -= 15;
-        }
-      }
-    },
-    // 3. position property object accessors
-    // position setter
-    set position(position) {
-      this._position = position;
-    },
-    // position getter
-    get position() {
-      return this._position;
-    },
-    set rotation(rotation) {
-      this._rotation = rotation;
-    },
-    get rotation() {
-      return this._rotation
-    }
-    // Implement getters and setters for the remaining
-    // props: this._rotation, this._edge, this._color
-  } // pequeño
-  parall1 = {
-    // 1. Data
-    _id: "parall1",
-    _position: createVector(),
-    _rotation: 0,
-    _color: color('red'),
-    _xo: 0,
-    _yo: 0,
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // 2. Methods
-    randomize: function() {
-      this._position = createVector(random(width/3, 5*width/6), random(5*height/6, height-20));
-      this._rotation = 15 * round(random(0, 25));
-      this._color = color(random(0, 254), random(0, 254), random(0, 254), 254);
-    },
-    // object shape
-    shape: function() {
-      if(parallReverse){
-        push()
-        scale(-1,1)
-        quad(this._xo - gui / 8, this._yo - gui / 8, this._xo + (6 * gui) / 16, this._yo - gui / 8, this._xo + gui / 8, this._yo + gui / 8, this._xo - (6 * gui) / 16, this._yo + gui / 8) 
-        pop()
-      }else{
-        quad(this._xo - gui / 8, this._yo - gui / 8, this._xo + (6 * gui) / 16, this._yo - gui / 8, this._xo + gui / 8, this._yo + gui / 8, this._xo - (6 * gui) / 16, this._yo + gui / 8)
-      }    
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function(x, y) {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){ 
-        piecePicked = this;
-      }
-      if(piecePicked === parall1){
-        this._strokeColor = color('white')
-        this._strokeWeight = 4
-      }else{
-        this._strokeWeight = 1
-        this._strokeColor = color('black') 
-      }
-    },
-    reverse: function(){
-      parallReverse = !parallReverse
-    },
-    // translate when dragged
-    dragged: function() { 
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        this._position = createVector(mouseX, mouseY);
-        piecePicked = parall1
-      }
-    },
-    wheel: function(){
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        piecePicked = parall1
-        if(event.deltaY > 0){
-          this._rotation += 15;
-        } else {
-          this._rotation -= 15;
-        }
-      }
-    },
-      
-    // 3. position property object accessors
-    // position setter
-    set position(position) {
-      this._position = position;
-    },
-    // position getter
-    get position() {
-      return this._position;
-    },
-    set rotation(rotation) {
-      this._rotation = rotation;
-    },
-    get rotation() {
-      return this._rotation
-    }
-    // Implement getters and setters for the remaining
-    // props: this._rotation, this._edge, this._color
-  } // pequeño
-  
-  saveButton = {
-    // 1. Data
-    _position: createVector(width-100, height-18),
-    _rotation: 0,
-    // _edge: random(40, 80),
-    _edge: 30,
-    _color: color('rgb(0,0,254)'),
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // object shape
-    shape: function() {
-      push();
-      rect(0, 0, this._edge*2, this._edge);  
-      let string="Save"  ; 
-      let txt="level";
-      textSize(12)
-      fill(255)
-      textFont("Helvetica")
-      strokeWeight(0.8)
-      textAlign(CENTER)
-    text(string,0,3,this._edge*2,this._edge)
-      text(txt,0,15,this._edge*2,this._edge)
-      pop();
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function() {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){ 
-        piecePicked = saveButton
-        var level = {
-          piezas: []
-        }
-        for(var element of draws){
-          level.piezas.push(expo(element))
-        }
-        saveJSON(level, `level.json`)
-      }
-      if(piecePicked === this){
-        this._strokeColor = color('white')
-      }else{
-        this._strokeColor = color('black') 
-      }
-    },
-  };
-  editButton = {
-    // 1. Data
-    _position: createVector(width/2, (height/2) + 35),
-    _rotation: 0,
-    // _edge: random(40, 80),
-    _edge: 30,
-    _color: color('rgba(255,165,0,1)'),
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // object shape
-    shape: function() {
-      push();
-      rect(0, 0, this._edge*2, this._edge);  
-      let string="Edit"  ; 
-      textSize(12)
-      fill(5)
-      textFont("Helvetica")
-      strokeWeight(0.8)
-      textAlign(CENTER)
-    text(string,0,9,this._edge*2,this._edge)
-      pop();
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function() {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){ 
-        buttonPicked = editButton
-        
-      }
-      if(buttonPicked === this){
-        editor = true
-        this._strokeColor = color('white')
-      }else{
-        editor = false
-        this._strokeColor = color('black') 
-      }
-    },
-  };
-  playButton = {
-    // 1. Data
-    _position: createVector(width/2, (height/2) - 60),
-    _rotation: 0,
-    // _edge: random(40, 80),
-    _edge: 30,
-    _color: color('rgb(255,112,112))'),
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // object shape
-    shape: function() {
-      push();
-      rect(0, 0, this._edge*2, this._edge);  
-      let string="Play"  ; 
-      textSize(12)
-      fill(5)
-      textFont("Helvetica")
-      strokeWeight(0.8)
-      textAlign(CENTER)
-      text(string,0,9,this._edge*2,this._edge)
-      pop();
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function() {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){ 
-        buttonPicked = playButton
-        
-      }
-      if(buttonPicked === this){
-        player = true
-        this._strokeColor = color('white')
-      }else{
-        player = false
-        this._strokeColor = color('black') 
-      }
-    },
-  };
-  exitButton = {
-    // 1. Data
-    _position: createVector(width-34, height-18),
-    _rotation: 0,
-    // _edge: random(40, 80),
-    _edge: 30,
-    _color: color('red'),
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // object shape
-    shape: function() {
-      push();
-      rect(0, 0, (this._edge*2)-20, this._edge);  
-      let string="Exit"  ; 
-      textSize(12)
-      fill(254)
-      textFont("Helvetica")
-      strokeWeight(0.8)
-      textAlign(CENTER)
-      text(string,0,9,this._edge*2,this._edge)
-      pop();
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function() {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){ 
-        buttonPicked = this
-      }
-      if(buttonPicked === this){
-        for(var element of draws) {
-          element.randomize()
-        }
-        editor = false
-        player = false
-        levelNum = 0
-        this._strokeColor = color('white')
-      }else{
-        this._strokeColor = color('black') 
-      }
-    },
-  };
-  nextButton = {
-    // 1. Data
-    _position: createVector(40, height-15),
-    _rotation: 0,
-    // _edge: random(40, 80),
-    _edge: 20,
-    _color: color('rgba(150,254,193,1)'),
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // object shape
-    shape: function() {
-      push();
-      rect(0, 0, this._edge, this._edge);  
-      pop();
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function() {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
+  const canvas = createCanvas(canvas_side, canvas_side);
+  // El clic derecho espeja el paralelogramo; sin esto aparece el menú
+  // contextual del navegador encima del juego.
+  canvas.elt.oncontextmenu = (e) => e.preventDefault();
+  createPieces();
+  createButtons();
+  randomizeAll();
+}
 
-        buttonPicked = this
-      }
-      if(buttonPicked === this){
-        check = true
-        buttonPicked = playButton
-        this._strokeColor = color('white')
-      }else{
-        this._strokeColor = color('black') 
-      }
-    },
-  };
-  previousButton = {
-    // 1. Data
-    _position: createVector(14, height-15),
-    _rotation: 0,
-    // _edge: random(40, 80),
-    _edge: 20,
-    _color: color('rgb(140,251,185)'),
-    _strokeColor: color('black'),
-    _strokeWeight: 1,
-    // object shape
-    shape: function() {
-      push();
-      rect(0, 0, this._edge, this._edge);  
-      pop();
-    },
-    // Implement this function to select a piece with
-    // a pointer device such as a mouse or a touch screen
-    pick: function() {
-      if(colorEquality(get(mouseX, mouseY), this._color.levels)){
-        buttonPicked = this
-      }
-      if(buttonPicked === this){
-        levelNum--
-        buttonPicked = playButton
-        this._strokeColor = color('white')
-      }else{
-        this._strokeColor = color('black') 
-      }
-    },
-  };
-  
-  draws = [cuadrado1, triangulo1, triangulo2, triangulo22, triangulo3, triangulo33, parall1]
-  
-  buttons = [saveButton, editButton, playButton, exitButton, nextButton]
-  
-  levels = [level6, level1, level2, level3, level5, level4, lastLevel]
-  // call and executes the piece randomized method:
-  for(var element of draws) {
-    element.randomize()
+function createPieces() {
+  const edge = gui / 2.8;
+  pieces = [
+    new Square('cuadrado', edge, {
+      xMin: width / 2, xMax: width - 50, yMin: 20, yMax: height / 6,
+    }),
+    new Triangle('triangulo1', gui / 2.8, gui / 5.6, {
+      xMin: 50, xMax: width / 2, yMin: 20, yMax: height / 6,
+    }),
+    new Triangle('triangulo2', gui / 2, gui / 4, {
+      xMin: 50, xMax: width / 6, yMin: height / 1.5, yMax: height - 50,
+    }),
+    new Triangle('triangulo22', gui / 2, gui / 4, {
+      xMin: (7 * width) / 8, xMax: width - 50, yMin: height / 3, yMax: height / 2,
+    }),
+    new Triangle('triangulo3', gui / 4, gui / 8, {
+      xMin: 50, xMax: width / 8, yMin: height / 3, yMax: height / 2,
+    }),
+    new Triangle('triangulo33', gui / 4, gui / 8, {
+      xMin: (5 * width) / 6, xMax: width - 20, yMin: height / 1.5, yMax: height - 20,
+    }),
+    new Parallelogram('parall1', gui, {
+      xMin: width / 3, xMax: (5 * width) / 6, yMin: (5 * height) / 6, yMax: height - 20,
+    }),
+  ];
+  piecesById = {};
+  for (const piece of pieces) {
+    piecesById[piece.id] = piece;
   }
 }
 
+function createButtons() {
+  buttons.play = new Button({
+    label: 'Play',
+    x: width / 2, y: height / 2 - 60, w: 60, h: 30,
+    background: color(255, 112, 112), textColor: 5,
+    onPress: () => { mode = 'player'; },
+  });
+  buttons.edit = new Button({
+    label: 'Edit',
+    x: width / 2, y: height / 2 + 35, w: 60, h: 30,
+    background: color(255, 165, 0), textColor: 5,
+    onPress: () => { mode = 'editor'; },
+  });
+  buttons.save = new Button({
+    label: 'Save\nlevel',
+    x: width - 100, y: height - 18, w: 60, h: 30,
+    background: color(0, 0, 254), textColor: 254,
+    onPress: saveLevel,
+  });
+  buttons.exit = new Button({
+    label: 'Exit',
+    x: width - 34, y: height - 18, w: 40, h: 30,
+    background: color('red'), textColor: 254,
+    onPress: exitToMenu,
+  });
+  buttons.next = new Button({
+    label: 'Next',
+    x: 40, y: height - 15, w: 44, h: 22,
+    background: color(150, 254, 193), textColor: 5,
+    onPress: nextLevel,
+  });
+}
 
 function draw() {
   background(130);
-  
-  if(editor== false && player == false){
-    displayButton(editButton)
-    displayButton(playButton)
-    image(img, -25, -20);
+  if (mode === 'menu') {
+    drawMenu();
+  } else {
+    drawGame();
   }
-  
-  if(editor || player) {
-    if (player){
-      displayLevel(levels[levelNum])
-      if(check && levelNum != levels.length-1){   
-        levelNum++
-        console.log(`Level ${levelNum} completed!`)
-        for(var elementt of draws) {
-          elementt.randomize()
-        }
-      }
-    }
-    if (grid) {
-      gridHint(10);
-    }
-    if(levelNum != levels.length-1){
-      for(var element of draws){
-        displayPiece(element)
-      }
-    }
-    if(levelNum < levels.length-1 && player){
-        displayButton(nextButton)
-    }
-    // if(levelNum > 0){
-    //   displayButton(previousButton)
-    // }
-    if(editor){
-      displayButton(saveButton)
-    }
-    displayButton(exitButton)
-    if(levelNum == levels.length-1){
-      image(img1, -15, -15)
-      console.log("Congrats!, you've completed all the levels.")
-    }
-  }
-  keyDown()
-  check = isCorrect()
+  handleHeldKeys();
+  updateCursor();
 }
 
-function displayPiece(piece) {
-  push();
-  piece.pick()
-  // translate according to the piece position getter
-  translate(piece._position.x, piece._position.y);
-  // Implement piece getters for the rotation and color
-  fill(piece._color);
-  stroke(piece._strokeColor);
-  // strokeWeight(piece._strokeWeight);
-  rotate(piece._rotation);
-  scale(SCALING);
-  piece.shape();
-  pop();
+function drawMenu() {
+  image(logoImg, -25, -20);
+  buttons.play.display();
+  buttons.edit.display();
 }
 
-function displayButton(button) {
-  push();
-  button.pick()
-  // translate according to the piece position getter
-  translate(button._position.x, button._position.y);
-  // Implement piece getters for the rotation and color
-  fill(button._color);
-  stroke(button._strokeColor);
-  // strokeWeight(piece._strokeWeight);
-  button.shape();
-  pop();
+function drawGame() {
+  if (mode === 'player' && !onLastLevel()) {
+    displayLevel(levels[levelNum]);
+  }
+  if (showGrid) {
+    gridHint(10);
+  }
+  if (!onLastLevel()) {
+    for (const piece of pieces) {
+      piece.display(piece === selectedPiece);
+    }
+  }
+
+  if (mode === 'player' && !onLastLevel()) {
+    buttons.next.display();
+    if (frameCount % WIN_CHECK_PERIOD === 0 && isLevelSolved()) {
+      console.log(`Level ${levelNum + 1} completed!`);
+      nextLevel();
+    }
+  }
+  if (mode === 'editor') {
+    buttons.save.display();
+  }
+  buttons.exit.display();
+
+  if (onLastLevel()) {
+    image(congratsImg, -15, -15);
+  }
+}
+
+function onLastLevel() {
+  return mode === 'player' && levelNum === levels.length - 1;
 }
 
 function displayLevel(level) {
-  for (var pieza of level.piezas){
-    push();
-    // translate according to the piece position getter
-    translate(pieza.position[0], pieza.position[1]);
-    // Implement piece getters for the rotation and color
-    fill(color("white"));
-    stroke(color("white"))
-    rotate(pieza.rotation[0]);
-    scale(SCALING);
-    if(pieza.id[0] == 'c') {
-      rect(0, 0, cuadrado1._edge); 
+  for (const pieza of level.piezas) {
+    const piece = piecesById[pieza.id];
+    if (piece) {
+      piece.displaySilhouette(pieza);
     }
-    if(pieza.id == 'triangulo1'){
-      triangulo1.shape()
-    }
-    if(pieza.id == 'triangulo2'){
-      triangulo2.shape()
-    }
-    if(pieza.id == 'triangulo22'){
-      triangulo22.shape()
-    }
-    if(pieza.id == 'triangulo3'){
-      triangulo3.shape()
-    }
-    if(pieza.id == 'triangulo33'){
-      triangulo33.shape()
-    }
-    if(pieza.id == 'parall1'){
-      parall1.shape()
-    }
-    pop();
   }
 }
 
-function isCorrect() {
-  loadPixels()
-  var count = 0;
-  for(var i = 0; i < pixels.length; ++i){
-    if(pixels[i] == 255)
-        count++;
+function isLevelSolved() {
+  loadPixels();
+  let count = 0;
+  for (let i = 0; i < pixels.length; i++) {
+    if (pixels[i] === 255) {
+      count++;
+    }
   }
-  if(count > 232030) {
-    return false
-  }
-  return true
-
-      
-    // if (colorEquality(pixelColor.levels, color("white").levels)) {
-    //   return false
-    // }else{
-    //   return true  
-    // }
+  return count <= SOLVED_PIXEL_THRESHOLD;
 }
 
-function gridHint(scale) {
+function nextLevel() {
+  if (mode !== 'player' || levelNum >= levels.length - 1) {
+    return;
+  }
+  levelNum++;
+  randomizeAll();
+}
+
+function exitToMenu() {
+  randomizeAll();
+  mode = 'menu';
+  levelNum = 0;
+  selectedPiece = null;
+  draggedPiece = null;
+}
+
+function saveLevel() {
+  const level = { piezas: pieces.map((piece) => piece.export()) };
+  saveJSON(level, 'level.json');
+}
+
+function randomizeAll() {
+  for (const piece of pieces) {
+    piece.randomize();
+  }
+}
+
+function gridHint(spacing) {
   push();
   stroke(200, 100, 200, 20);
   strokeWeight(1);
-  let i;
-  for (i = 0; i <= width / scale; i++) {
-    line(i * scale, 0, i * scale, height);
+  for (let i = 0; i <= width / spacing; i++) {
+    line(i * spacing, 0, i * spacing, height);
   }
-  for (i = 0; i <= height / scale; i++) {
-    line(0, i * scale, width, i * scale);
+  for (let i = 0; i <= height / spacing; i++) {
+    line(0, i * spacing, width, i * spacing);
   }
   pop();
 }
 
-// Translation
-function mouseDragged() {
-  for(var element of draws) {
-    element.pick()
-    element.dragged()
+// --- Entrada -----------------------------------------------------------
+
+// Devuelve la pieza visible bajo el punto (la dibujada más arriba).
+function pieceAt(x, y) {
+  for (let i = pieces.length - 1; i >= 0; i--) {
+    if (pieces[i].contains(x, y)) {
+      return pieces[i];
+    }
   }
+  return null;
 }
 
-// Rotation
-function mouseWheel(event) {
-  for(var element of draws) {
-    element.pick()
-    element.wheel()
-  }
+// La pieza agarrada pasa al final del arreglo para dibujarse encima
+// de las demás mientras se mueve.
+function bringToFront(piece) {
+  const index = pieces.indexOf(piece);
+  pieces.splice(index, 1);
+  pieces.push(piece);
 }
 
 function mousePressed() {
-  if(colorEquality(get(mouseX, mouseY), parall1._color.levels) && piecePicked === parall1){
-    if(mouseButton == RIGHT){
-          parall1.reverse()
-        }
+  if (mode === 'menu') {
+    buttons.play.handlePress(mouseX, mouseY);
+    buttons.edit.handlePress(mouseX, mouseY);
+    return;
   }
-  for(var element of draws) {
-    element.pick()
+
+  // Los botones tienen prioridad sobre las piezas.
+  if (buttons.exit.handlePress(mouseX, mouseY)) {
+    return;
   }
-  for(var button of buttons) {
-    button.pick()
+  if (mode === 'editor' && buttons.save.handlePress(mouseX, mouseY)) {
+    return;
+  }
+  if (mode === 'player' && !onLastLevel() && buttons.next.handlePress(mouseX, mouseY)) {
+    return;
+  }
+  if (onLastLevel()) {
+    return;
+  }
+
+  const piece = pieceAt(mouseX, mouseY);
+  if (piece) {
+    selectedPiece = piece;
+    bringToFront(piece);
+    if (mouseButton === RIGHT) {
+      if (piece instanceof Parallelogram) {
+        piece.reverse();
+      }
+      return;
+    }
+    draggedPiece = piece;
+    // Guardar el desfase entre el cursor y el centro evita que la pieza
+    // "salte" al centrarse en el mouse al empezar a arrastrar.
+    dragOffset = createVector(
+      piece.position.x - mouseX,
+      piece.position.y - mouseY
+    );
+  } else if (mouseButton === LEFT) {
+    selectedPiece = null;
   }
 }
 
-// Show grid
+function mouseDragged() {
+  if (draggedPiece) {
+    // Seguir siempre al mouse, aunque se mueva rápido y el cursor salga
+    // momentáneamente de la pieza (el original soltaba la pieza).
+    draggedPiece.position = createVector(
+      mouseX + dragOffset.x,
+      mouseY + dragOffset.y
+    );
+  }
+}
+
+function mouseReleased() {
+  draggedPiece = null;
+}
+
+function mouseWheel(event) {
+  if (mode === 'menu' || onLastLevel()) {
+    return;
+  }
+  const piece = pieceAt(mouseX, mouseY);
+  if (piece) {
+    selectedPiece = piece;
+    piece.rotateBy(event.deltaY > 0 ? 15 : -15);
+    return false; // evita que la página haga scroll mientras se rota
+  }
+}
+
 function keyPressed() {
-  // toggle grid hint
   if (key === 'g') {
-    grid = !grid;
+    showGrid = !showGrid;
   }
-  
-  if (key === '1') {
-    piecePicked = cuadrado1
+  const index = parseInt(key, 10);
+  if (index >= 1 && index <= KEY_ORDER.length) {
+    selectedPiece = piecesById[KEY_ORDER[index - 1]];
   }
-  
-  if (key === '2') {
-    piecePicked = triangulo1
-  }
-  
-  if (key === '3') {
-    piecePicked = triangulo2
-  }
-  
-  if (key === '4') {
-    piecePicked = triangulo22
-  }
-  
-  if (key === '5') {
-    piecePicked = triangulo3
-  }
-  
-  if (key === '6') {
-    piecePicked = triangulo33
-  }
-  
-  if (key === '7') {
-    piecePicked = parall1
-  }
-  
   if (key === 'c') {
-    piecePicked = undefined
+    selectedPiece = null;
   }
-  
+  if (!selectedPiece) {
+    return;
+  }
   if (key === 'q') {
-    if(piecePicked === undefined) {
-      throw new Error("Select a piece")
-    }
-    piecePicked._rotation -= 15
+    selectedPiece.rotateBy(-15);
   }
-  
   if (key === 'e') {
-    if(piecePicked === undefined) {
-      throw new Error("Select a piece")
-    }
-    piecePicked._rotation += 15
+    selectedPiece.rotateBy(15);
   }
-  
-  if (key === 'r') {
-    if(piecePicked !== parall1) {
-      throw new Error("Select the parallelogram")
-    }
-    piecePicked.reverse()
+  if (key === 'r' && selectedPiece instanceof Parallelogram) {
+    selectedPiece.reverse();
   }
-  
-  if (keyCode === UP_ARROW) {
-    piecePicked._position.y -= 1
-  } 
-  if (keyCode === DOWN_ARROW) {
-    piecePicked._position.y += 1
-  } 
-  if (keyCode === LEFT_ARROW) {
-    piecePicked._position.x -= 1
-  } 
-  if (keyCode === RIGHT_ARROW) {
-    piecePicked._position.x += 1
-  } 
 }
 
-function keyDown(){
-  if (keyIsDown (87)) {
-    piecePicked._position.y -= 1
-  } 
-  if (keyIsDown (83)) {
-    piecePicked._position.y += 1
-  } 
-  if (keyIsDown (65)) {
-    piecePicked._position.x -= 1
-  } 
-  if (keyIsDown (68)) {
-    piecePicked._position.x += 1
-  } 
-}
-
-function expo(piece) {
-    return {
-      id: piece._id,
-      position: [piece.position.x, piece.position.y],
-      rotation: [piece.rotation],
-      rever: parallReverse
-    }
-}
-
-// Check if object color and get color are equal
-function colorEquality(rgb1, rgb2) {
-  if(rgb1[0] == rgb2[0] && rgb1[1] == rgb2[1] && rgb1[2] == rgb2[2]) {
-    return true
+// Movimiento fino continuo mientras se mantienen WASD o las flechas.
+function handleHeldKeys() {
+  if (!selectedPiece || mode === 'menu') {
+    return;
   }
-  return false
+  if (keyIsDown(87) || keyIsDown(UP_ARROW)) {
+    selectedPiece.moveBy(0, -1);
+  }
+  if (keyIsDown(83) || keyIsDown(DOWN_ARROW)) {
+    selectedPiece.moveBy(0, 1);
+  }
+  if (keyIsDown(65) || keyIsDown(LEFT_ARROW)) {
+    selectedPiece.moveBy(-1, 0);
+  }
+  if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) {
+    selectedPiece.moveBy(1, 0);
+  }
+}
+
+function updateCursor() {
+  if (mode === 'menu') {
+    cursor(ARROW);
+    return;
+  }
+  if (draggedPiece) {
+    cursor('grabbing');
+    return;
+  }
+  if (!onLastLevel() && pieceAt(mouseX, mouseY)) {
+    cursor('grab');
+  } else {
+    cursor(ARROW);
+  }
 }
